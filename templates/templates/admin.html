@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Chat View</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>All Chat Messages</h1>
+        <p>View all user chats below</p>
+    </div>
+
+    <div style="padding: 20px;">
+        {% for msg in messages %}
+            <div class="bubble" style="background:#f1f1f1; color:#000;">[{{ msg[0] }}] {{ msg[1] }}</div>
+        {% else %}
+            <p>No messages yet.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>
