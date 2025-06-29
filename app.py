@@ -108,5 +108,6 @@ def admin():
 if __name__ == '__main__':
     init_db()
     print("Running app with SocketIO...")
-    socketio.run(app, debug=True, host="127.0.0.1", port=5000)
+    socketio.run(app, allow_unsafe_werkzeug=True)
+
 
