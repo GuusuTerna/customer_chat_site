@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_socketio import SocketIO, send
 from datetime import datetime
 import sqlite3
+import os
 
 app = Flask(__name__)
 app.secret_key = 'chat-site-secret-key'
@@ -26,8 +27,6 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-
     conn.commit()
     conn.close()
 
@@ -73,7 +72,6 @@ def chat():
             return redirect(url_for('join'))
         return render_template('chat.html', username=session['username'])
 
-
 # === SOCKET EVENTS ===
 @socketio.on('message')
 def handle_message(data):
@@ -104,10 +102,8 @@ def admin():
     conn.close()
     return render_template('admin.html', messages=messages)
 
-
 if __name__ == '__main__':
     init_db()
     print("Running app with SocketIO...")
-    socketio.run(app, allow_unsafe_werkzeug=True)
-
-
+    PORT = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host="0.0.0.0", port=PORT, allow_unsafe_werkzeug=True)
