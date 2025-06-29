@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Support Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='depop-icon.png') }}" alt="Depop Logo" style="height: 40px; margin-bottom: 10px;">
+        <h1>Depop Support</h1>
+        <p style="margin-bottom: 6px;">How can we help you today?</p>
+        <p style="font-weight: bold;">Activate your account now to start receiving instant payments — don’t miss out!</p>
+    </div>
+
+    <!-- Email subscription form -->
+    <form action="/subscribe" method="POST" style="text-align: center; margin-top: 20px;">
+        <input type="email" name="email" placeholder="Enter your email..." required
+               style="padding: 12px; width: 60%; max-width: 300px; border-radius: 10px;"><br><br>
+        <label style="font-size: 14px;">
+            <input type="checkbox" name="newsletter"> Subscribe to our newsletter
+        </label><br><br>
+        <button type="submit" style="padding: 10px 20px; border-radius: 10px; background-color: #ff3c4c; color: white;">Submit</button>
+    </form>
+
+    <!-- FAQs -->
+    <div class="faq-cards">
+        <a href="/chat?question=How to activate my account?" class="card">How to activate my account?</a>
+        <a href="/chat?question=Why is my account restricted?" class="card">Why is my account restricted?</a>
+        <a href="/chat?question=Payment issues" class="card">Payment issues</a>
+        <a href="/chat?question=Returns and refunds" class="card">Returns and refunds</a>
+        <a href="/chat?question=I am new to Depop" class="card">I am new to Depop</a>
+    </div>
+
+    <!-- Chat button -->
+    <div class="chat-button">
+        <a href="/join" class="nav-link">Chat with us</a>
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="bottom-nav">
+        <a href="/" class="nav-link active">Home</a>
+        <a href="/chat" class="nav-link">Chat</a>
+    </div>
+</body>
+</html>
