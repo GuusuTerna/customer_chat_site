@@ -6,7 +6,8 @@ import sqlite3
 
 app = Flask(__name__)
 app.secret_key = 'chat-site-secret-key'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")  # ✅ Only keep this one
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
 
 def init_db():
     conn = sqlite3.connect('chat.db')
