@@ -1,0 +1,159 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f7f7f7;
+}
+
+.header {
+    background: linear-gradient(135deg, #ff3c4c 0%, #ff5f6d 100%);
+    color: white;
+    padding: 60px 20px 30px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.header h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+}
+
+.header p {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+.faq-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: 0.3s;
+}
+.card:hover {
+    background-color: #ffeedf;
+}
+
+.chat-button {
+    text-align: center;
+    margin: 30px 0;
+}
+.chat-button a {
+    display: inline-block;
+    background-color: #ff5f6d;
+    color: white;
+    padding: 14px 28px;
+    border-radius: 30px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: 0.2s;
+}
+.chat-button a:hover {
+    background-color: #e6505c;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    display: flex;
+    justify-content: space-around;
+    border-top: 1px solid #ddd;
+    padding: 10px 0;
+}
+.nav-link {
+    color: #888;
+    text-decoration: none;
+    font-weight: bold;
+}
+.nav-link.active {
+    color: #ff5f6d;
+}
+
+#chat-box {
+    max-width: 600px;
+    margin: 20px auto 70px auto;
+    padding: 0 20px;
+}
+
+#messages {
+    background-color: #fff;
+    height: 300px;
+    border-radius: 10px;
+    padding: 10px;
+    overflow-y: auto;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+}
+
+#input-area {
+    display: flex;
+    gap: 10px;
+}
+
+#msgInput {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+#input-area button {
+    padding: 12px 20px;
+    background-color: #ff5f6d;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.bubble {
+    background: #ffeedf;
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin: 5px 0;
+    width: fit-content;
+    max-width: 80%;
+}
+
+.bubble {
+    padding: 10px 14px;
+    margin: 10px;
+    max-width: 70%;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.4;
+    display: inline-block;
+    clear: both;
+}
+
+.bubble.mine {
+    background-color: #007bff;
+    color: white;
+    float: right;
+    border-bottom-right-radius: 0;
+}
+
+.bubble.other {
+    background-color: #ff3c4c;  /* Depop red */
+    color: white;
+    float: left;
+    border-bottom-left-radius: 0;
+}
+
+.timestamp {
+    font-size: 10px;
+    margin-left: 10px;
+    opacity: 0.7;
+}
