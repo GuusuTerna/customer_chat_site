@@ -93,14 +93,39 @@ def handle_message(data):
 def join():
     return render_template('join.html')
 
+
 @app.route('/admin')
 def admin():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
     conn = sqlite3.connect('chat.db')
     c = conn.cursor()
     c.execute("SELECT username, text FROM messages ORDER BY id DESC LIMIT 100")
     messages = c.fetchall()
     conn.close()
     return render_template('admin.html', messages=messages)
+
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if username == 'admin' and password == 'password123':  # Replace with real credentials later
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin'))
+        else:
+            flash('Invalid credentials')
+            return redirect(url_for('admin_login'))
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
 
 if __name__ == '__main__':
     init_db()
