@@ -10,8 +10,12 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 
 def init_db():
+    if os.path.exists('chat.db'):
+        os.remove('chat.db')  # delete the old DB file
+
     conn = sqlite3.connect('chat.db')
     c = conn.cursor()
+    # recreate the new schema
     c.execute('''
         CREATE TABLE IF NOT EXISTS subscribers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +38,7 @@ def init_db():
             password TEXT NOT NULL
         )
     ''')
+
     # Add default admin
     c.execute("SELECT * FROM admins WHERE username = ?", ('admin',))
     if not c.fetchone():
