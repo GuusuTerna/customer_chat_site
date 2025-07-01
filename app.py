@@ -8,12 +8,12 @@ app = Flask(__name__)
 app.secret_key = 'chat-site-secret-key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
+DB_FILE = 'chat_v2.db'
+
 
 def init_db():
-
-    conn = sqlite3.connect('chat.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    # recreate the new schema
     c.execute('''
         CREATE TABLE IF NOT EXISTS subscribers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,12 +36,9 @@ def init_db():
             password TEXT NOT NULL
         )
     ''')
-
-    # Add default admin
     c.execute("SELECT * FROM admins WHERE username = ?", ('admin',))
     if not c.fetchone():
         c.execute("INSERT INTO admins (username, password) VALUES (?, ?)", ('admin', 'admin123'))
-
     conn.commit()
     conn.close()
 
@@ -49,6 +46,7 @@ def init_db():
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
@@ -61,7 +59,7 @@ def subscribe():
 
     if wants_newsletter:
         try:
-            conn = sqlite3.connect('chat.db')
+            conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             c.execute("INSERT INTO subscribers (email) VALUES (?)", (email,))
             conn.commit()
@@ -74,9 +72,11 @@ def subscribe():
 
     return redirect(url_for('index'))
 
+
 @app.route('/join')
 def join():
     return render_template('join.html')
+
 
 @app.route('/chat', methods=['GET', 'POST'])
 def chat():
@@ -92,13 +92,14 @@ def chat():
             return redirect(url_for('join'))
         return render_template('chat.html', username=session['username'])
 
+
 @app.route('/adminlogin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
 
-        conn = sqlite3.connect('chat.db')
+        conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
         c.execute("SELECT * FROM admins WHERE username = ? AND password = ?", (username, password))
         admin = c.fetchone()
@@ -113,6 +114,7 @@ def admin_login():
 
     return render_template('admin_login.html')
 
+
 @app.route('/logout')
 def logout():
     session.pop('is_admin', None)
@@ -120,24 +122,26 @@ def logout():
     flash("You have been logged out.")
     return redirect(url_for('admin_login'))
 
+
 @app.route('/admin')
 def admin():
     if not session.get('is_admin'):
         return redirect(url_for('admin_login'))
 
-    conn = sqlite3.connect('chat.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT DISTINCT sender FROM messages WHERE receiver = 'admin'")
     users = [row[0] for row in c.fetchall()]
     conn.close()
     return render_template('admin.html', users=users)
 
+
 @app.route('/admin/chat/<username>')
 def view_user_chat(username):
     if not session.get('is_admin'):
         return redirect(url_for('admin_login'))
 
-    conn = sqlite3.connect('chat.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("""
         SELECT sender, text, timestamp FROM messages
@@ -151,12 +155,15 @@ def view_user_chat(username):
     conn.close()
     return render_template('admin_chat.html', messages=messages, target=username)
 
+
 # === SOCKET EVENTS ===
 @socketio.on('join')
 def handle_join(data):
     room = data.get('room')
-    join_room(room)
-    print(f"{room} joined room")
+    if room:
+        join_room(room)
+        print(f"{room} joined room")
+
 
 @socketio.on('message')
 def handle_message(data):
@@ -165,24 +172,75 @@ def handle_message(data):
     text = data.get('text', '').strip()
     timestamp = datetime.now().strftime('%H:%M')
 
-    msg_payload = {
-        'sender': sender,
-        'receiver': receiver,
-        'text': text,
-        'timestamp': timestamp
-    }
+    if not sender or not receiver or not text:
+        return
 
     # Save message to DB
-    conn = sqlite3.connect('chat.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("INSERT INTO messages (sender, receiver, text) VALUES (?, ?, ?)",
               (sender, receiver, text))
     conn.commit()
     conn.close()
 
-    # Send to receiver only (private message)
-    target_room = receiver if receiver != 'admin' else sender
-    send(msg_payload, room=target_room)
+    # Emit message to correct room
+    socketio.emit('message', {
+        'user': sender,
+        'to': receiver,
+        'text': text,
+        'timestamp': timestamp
+    }, room=receiver if receiver != 'admin' else sender)
+
+
+@socketio.on('admin_reply')
+def handle_admin_reply(data):
+    to_user = data.get('to')
+    text = data.get('text', '').strip()
+    timestamp = datetime.now().strftime('%H:%M')
+
+    if not to_user or not text:
+        return
+
+    # Save admin message to DB
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT INTO messages (sender, receiver, text) VALUES (?, ?, ?)",
+              ('admin', to_user, text))
+    conn.commit()
+    conn.close()
+
+    # Emit reply to user room
+    socketio.emit('message', {
+        'user': 'Admin',
+        'to': to_user,
+        'text': text,
+        'timestamp': timestamp
+    }, room=to_user)
+
+
+@socketio.on('load_history')
+def handle_load_history(data):
+    username = data.get('username')
+    if not username:
+        return
+
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        SELECT sender, text FROM messages
+        WHERE (sender = ? AND receiver = 'admin')
+           OR (sender = 'admin' AND receiver = ?)
+        ORDER BY timestamp ASC
+    """, (username, username))
+    rows = c.fetchall()
+    conn.close()
+
+    messages = []
+    for sender, text in rows:
+        user = 'Admin' if sender == 'admin' else sender
+        messages.append({'user': user, 'text': text})
+
+    socketio.emit('history', {'messages': messages})
 
 
 if __name__ == '__main__':

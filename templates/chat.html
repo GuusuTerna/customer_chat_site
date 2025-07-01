@@ -95,12 +95,15 @@
         const username = "{{ username }}";
         const messagesDiv = document.getElementById('messages');
 
+        // Join private room on page load
+        socket.emit('join', { room: username });
+
         function renderMessage(from, text) {
             const div = document.createElement('div');
             const bubble = document.createElement('div');
             bubble.classList.add('bubble');
             bubble.textContent = `[${from}] ${text}`;
-            if (from === 'Admin') {
+            if (from === 'admin') {
                 bubble.classList.add('other');
             } else {
                 bubble.classList.add('mine');
@@ -115,7 +118,8 @@
             const message = input.value.trim();
             if (message !== '') {
                 socket.emit('message', {
-                    user: username,
+                    sender: username,
+                    receiver: 'admin',
                     text: message
                 });
                 input.value = '';
@@ -123,8 +127,9 @@
         }
 
         socket.on('message', function(data) {
-            if (data.user === username || data.to === username) {
-                renderMessage(data.user, data.text);
+            if ((data.sender === username && data.receiver === 'admin') || 
+                (data.sender === 'admin' && data.receiver === username)) {
+                renderMessage(data.sender, data.text);
             }
         });
 
@@ -134,7 +139,8 @@
             const question = urlParams.get('question');
             if (question) {
                 socket.emit('message', {
-                    user: username,
+                    sender: username,
+                    receiver: 'admin',
                     text: question
                 });
             }
