@@ -10,8 +10,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 
 def init_db():
-    if os.path.exists('chat.db'):
-        os.remove('chat.db')  # delete the old DB file
 
     conn = sqlite3.connect('chat.db')
     c = conn.cursor()
