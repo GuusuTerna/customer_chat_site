@@ -34,7 +34,7 @@ def init_db():
             password TEXT NOT NULL
         )
     ''')
-        # Add default admin if not exists
+    # Add default admin if not exists
     c.execute("SELECT * FROM admins WHERE username = ?", ('admin',))
     if not c.fetchone():
         c.execute("INSERT INTO admins (username, password) VALUES (?, ?)", ('admin', 'admin123'))
@@ -120,8 +120,6 @@ def admin():
     return render_template('admin.html', messages=messages)
 
 
-
-
 @app.route('/adminlogin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -130,7 +128,8 @@ def admin_login():
 
         conn = sqlite3.connect('chat.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM admin_users WHERE username = ? AND password = ?", (username, password))
+        # ✅ Fixed table name here:
+        c.execute("SELECT * FROM admins WHERE username = ? AND password = ?", (username, password))
         admin = c.fetchone()
         conn.close()
 
@@ -140,19 +139,15 @@ def admin_login():
         else:
             flash('❌ Invalid credentials.')
             return redirect(url_for('admin_login'))
-    
+
     return render_template('admin_login.html')
-
-
 
 
 @app.route('/logout')
 def logout():
-    session.pop('admin_logged_in', None)
+    session.pop('is_admin', None)
     flash("You have been logged out.")
     return redirect(url_for('admin_login'))
-
-
 
 
 if __name__ == '__main__':
