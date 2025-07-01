@@ -109,8 +109,7 @@ def join():
 
 @app.route('/admin')
 def admin():
-    if not session.get('admin_logged_in'):
-        flash("You must log in first.")
+    if not session.get('is_admin'):
         return redirect(url_for('admin_login'))
 
     conn = sqlite3.connect('chat.db')
@@ -131,18 +130,19 @@ def admin_login():
 
         conn = sqlite3.connect('chat.db')
         c = conn.cursor()
-        c.execute("SELECT * FROM admins WHERE username = ? AND password = ?", (username, password))
+        c.execute("SELECT * FROM admin_users WHERE username = ? AND password = ?", (username, password))
         admin = c.fetchone()
         conn.close()
 
         if admin:
-            session['admin_logged_in'] = True
-            flash('✅ Logged in successfully!')
+            session['is_admin'] = True
             return redirect(url_for('admin'))
         else:
             flash('❌ Invalid credentials.')
-
+            return redirect(url_for('admin_login'))
+    
     return render_template('admin_login.html')
+
 
 
 
