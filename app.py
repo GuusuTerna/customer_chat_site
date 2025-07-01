@@ -27,8 +27,21 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+        # Add default admin if not exists
+    c.execute("SELECT * FROM admins WHERE username = ?", ('admin',))
+    if not c.fetchone():
+        c.execute("INSERT INTO admins (username, password) VALUES (?, ?)", ('admin', 'admin123'))
+
     conn.commit()
     conn.close()
+
 
 @app.route('/')
 def index():
@@ -97,6 +110,7 @@ def join():
 @app.route('/admin')
 def admin():
     if not session.get('admin_logged_in'):
+        flash("You must log in first.")
         return redirect(url_for('admin_login'))
 
     conn = sqlite3.connect('chat.db')
@@ -108,23 +122,37 @@ def admin():
 
 
 
-@app.route('/admin/login', methods=['GET', 'POST'])
+
+@app.route('/adminlogin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if username == 'admin' and password == 'password123':  # Replace with real credentials later
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+
+        conn = sqlite3.connect('chat.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM admins WHERE username = ? AND password = ?", (username, password))
+        admin = c.fetchone()
+        conn.close()
+
+        if admin:
             session['admin_logged_in'] = True
+            flash('✅ Logged in successfully!')
             return redirect(url_for('admin'))
         else:
-            flash('Invalid credentials')
-            return redirect(url_for('admin_login'))
+            flash('❌ Invalid credentials.')
+
     return render_template('admin_login.html')
 
-@app.route('/admin/logout')
-def admin_logout():
+
+
+@app.route('/logout')
+def logout():
     session.pop('admin_logged_in', None)
+    flash("You have been logged out.")
     return redirect(url_for('admin_login'))
+
+
 
 
 if __name__ == '__main__':
