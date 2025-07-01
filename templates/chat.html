@@ -95,7 +95,7 @@
         const username = "{{ username }}";
         const messagesDiv = document.getElementById('messages');
 
-        // Join private room on page load
+        // Join the user's private room
         socket.emit('join', { room: username });
 
         function renderMessage(from, text) {
@@ -103,7 +103,7 @@
             const bubble = document.createElement('div');
             bubble.classList.add('bubble');
             bubble.textContent = `[${from}] ${text}`;
-            if (from === 'admin') {
+            if (from.toLowerCase() === 'admin') {
                 bubble.classList.add('other');
             } else {
                 bubble.classList.add('mine');
@@ -127,13 +127,15 @@
         }
 
         socket.on('message', function(data) {
-            if ((data.sender === username && data.receiver === 'admin') || 
-                (data.sender === 'admin' && data.receiver === username)) {
-                renderMessage(data.sender, data.text);
+            if (
+                (data.user === username && data.to === 'admin') ||
+                (data.user === 'Admin' && data.to === username)
+            ) {
+                renderMessage(data.user, data.text);
             }
         });
 
-        // Auto-send FAQ if passed
+        // Optional: Auto-send FAQ message via ?question= query param
         window.onload = function () {
             const urlParams = new URLSearchParams(window.location.search);
             const question = urlParams.get('question');
