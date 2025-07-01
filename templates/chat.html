@@ -4,13 +4,75 @@
     <meta charset="UTF-8">
     <title>Live Chat</title>
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
-
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='depop-iconn.png') }}" type="image/png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .header img {
+            height: 80px;
+            margin-bottom: 10px;
+        }
+        #chat-box {
+            max-width: 600px;
+            margin: auto;
+        }
+        #messages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: scroll;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .bubble {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .mine {
+            background: #e60023;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .other {
+            background: #ddd;
+            color: black;
+            margin-right: auto;
+        }
+        #input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #e60023;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .bottom-nav {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .nav-link {
+            margin: 0 10px;
+            text-decoration: none;
+            color: #e60023;
+        }
+    </style>
 </head>
 <body>
-    <div class="header">
-        <img src="{{ url_for('static', filename='depop-iconn.png') }}" alt="Depop Logo" style="height: 80px; margin-bottom: 10px;">
-
+    <div class="header" style="text-align:center;">
+        <img src="{{ url_for('static', filename='depop-iconn.png') }}" alt="Depop Logo">
         <h1>Chat Support</h1>
         <p>Ask us anything, we’re here to help.</p>
     </div>
@@ -29,42 +91,54 @@
     </div>
 
     <script>
-    const socket = io();
+        const socket = io();
+        const username = "{{ username }}";
+        const messagesDiv = document.getElementById('messages');
 
-    // Auto-send question if it was passed from the FAQ
-    window.onload = function () {
-        const urlParams = new URLSearchParams(window.location.search);
-        const question = urlParams.get('question');
-        if (question) {
-            socket.emit('message', {
-                user: "{{ username }}",
-                text: question
-            });
+        function renderMessage(from, text) {
+            const div = document.createElement('div');
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
+            bubble.textContent = `[${from}] ${text}`;
+            if (from === 'Admin') {
+                bubble.classList.add('other');
+            } else {
+                bubble.classList.add('mine');
+            }
+            div.appendChild(bubble);
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
-    };
 
-    socket.on('message', function(msg) {
-        const div = document.getElementById('messages');
-        const isMine = msg.startsWith(`[{{ username }}]`);
-        const bubbleClass = isMine ? "bubble mine" : "bubble other";
-        div.innerHTML += `<div class="${bubbleClass}">${msg}</div>`;
-        div.scrollTop = div.scrollHeight;
-    });
-
-    function sendMessage() {
-        const input = document.getElementById('msgInput');
-        const message = input.value.trim();
-        if (message !== '') {
-            socket.emit('message', {
-                user: "{{ username }}",
-                text: message
-            });
-            input.value = '';
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const message = input.value.trim();
+            if (message !== '') {
+                socket.emit('message', {
+                    user: username,
+                    text: message
+                });
+                input.value = '';
+            }
         }
-    }
-</script>
 
+        socket.on('message', function(data) {
+            if (data.user === username || data.to === username) {
+                renderMessage(data.user, data.text);
+            }
+        });
 
-
+        // Auto-send FAQ if passed
+        window.onload = function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const question = urlParams.get('question');
+            if (question) {
+                socket.emit('message', {
+                    user: username,
+                    text: question
+                });
+            }
+        };
+    </script>
 </body>
 </html>

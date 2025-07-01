@@ -1,6 +1,5 @@
-from flask import session
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_socketio import SocketIO, send
+from flask import session, Flask, render_template, request, redirect, url_for, flash
+from flask_socketio import SocketIO, send, join_room
 from datetime import datetime
 import sqlite3
 import os
@@ -22,7 +21,8 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            receiver TEXT NOT NULL,
             text TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -34,7 +34,7 @@ def init_db():
             password TEXT NOT NULL
         )
     ''')
-    # Add default admin if not exists
+    # Add default admin
     c.execute("SELECT * FROM admins WHERE username = ?", ('admin',))
     if not c.fetchone():
         c.execute("INSERT INTO admins (username, password) VALUES (?, ?)", ('admin', 'admin123'))
@@ -71,6 +71,10 @@ def subscribe():
 
     return redirect(url_for('index'))
 
+@app.route('/join')
+def join():
+    return render_template('join.html')
+
 @app.route('/chat', methods=['GET', 'POST'])
 def chat():
     if request.method == 'POST':
@@ -85,41 +89,6 @@ def chat():
             return redirect(url_for('join'))
         return render_template('chat.html', username=session['username'])
 
-# === SOCKET EVENTS ===
-@socketio.on('message')
-def handle_message(data):
-    user = data.get('user', 'Anonymous')
-    text = data.get('text', '').strip()
-    timestamp = datetime.now().strftime('%H:%M')
-    full_msg = f"[{user}] {text} <span class='timestamp'>{timestamp}</span>"
-    print(full_msg)
-    send(full_msg, broadcast=True)
-
-    # Save to DB
-    conn = sqlite3.connect('chat.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO messages (username, text) VALUES (?, ?)", (user, text))
-    conn.commit()
-    conn.close()
-
-@app.route('/join')
-def join():
-    return render_template('join.html')
-
-
-@app.route('/admin')
-def admin():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_login'))
-
-    conn = sqlite3.connect('chat.db')
-    c = conn.cursor()
-    c.execute("SELECT username, text FROM messages ORDER BY id DESC LIMIT 100")
-    messages = c.fetchall()
-    conn.close()
-    return render_template('admin.html', messages=messages)
-
-
 @app.route('/adminlogin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -128,7 +97,6 @@ def admin_login():
 
         conn = sqlite3.connect('chat.db')
         c = conn.cursor()
-        # ✅ Fixed table name here:
         c.execute("SELECT * FROM admins WHERE username = ? AND password = ?", (username, password))
         admin = c.fetchone()
         conn.close()
@@ -142,12 +110,76 @@ def admin_login():
 
     return render_template('admin_login.html')
 
-
 @app.route('/logout')
 def logout():
     session.pop('is_admin', None)
+    session.pop('username', None)
     flash("You have been logged out.")
     return redirect(url_for('admin_login'))
+
+@app.route('/admin')
+def admin():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+
+    conn = sqlite3.connect('chat.db')
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT sender FROM messages WHERE receiver = 'admin'")
+    users = [row[0] for row in c.fetchall()]
+    conn.close()
+    return render_template('admin.html', users=users)
+
+@app.route('/admin/chat/<username>')
+def view_user_chat(username):
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_login'))
+
+    conn = sqlite3.connect('chat.db')
+    c = conn.cursor()
+    c.execute("""
+        SELECT sender, text, timestamp FROM messages
+        WHERE sender = ? AND receiver = 'admin'
+        UNION
+        SELECT sender, text, timestamp FROM messages
+        WHERE sender = 'admin' AND receiver = ?
+        ORDER BY timestamp ASC
+    """, (username, username))
+    messages = c.fetchall()
+    conn.close()
+    return render_template('admin_chat.html', messages=messages, target=username)
+
+# === SOCKET EVENTS ===
+@socketio.on('join')
+def handle_join(data):
+    room = data.get('room')
+    join_room(room)
+    print(f"{room} joined room")
+
+@socketio.on('message')
+def handle_message(data):
+    sender = data.get('sender', 'Anonymous').strip()
+    receiver = data.get('receiver', 'admin').strip()
+    text = data.get('text', '').strip()
+    timestamp = datetime.now().strftime('%H:%M')
+
+    msg_payload = {
+        'sender': sender,
+        'receiver': receiver,
+        'text': text,
+        'timestamp': timestamp
+    }
+
+    # Save message to DB
+    conn = sqlite3.connect('chat.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO messages (sender, receiver, text) VALUES (?, ?, ?)",
+              (sender, receiver, text))
+    conn.commit()
+    conn.close()
+
+    # Send to receiver only (private message)
+    target_room = receiver if receiver != 'admin' else sender
+    send(msg_payload, room=target_room)
 
 
 if __name__ == '__main__':
