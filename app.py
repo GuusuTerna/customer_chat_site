@@ -3,14 +3,24 @@ from flask_socketio import SocketIO, send, join_room
 from datetime import datetime
 import sqlite3
 import os
+from werkzeug.utils import secure_filename
 
+# === Upload Config ===
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2MB
+
+# === Flask App Setup ===
 app = Flask(__name__)
 app.secret_key = 'chat-site-secret-key'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 DB_FILE = 'chat_v2.db'
 
 
+# === Helper Functions ===
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -43,6 +53,11 @@ def init_db():
     conn.close()
 
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# === Routes ===
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -153,7 +168,28 @@ def view_user_chat(username):
     return render_template('admin_chat.html', messages=messages, target=username)
 
 
-# === SOCKET EVENTS ===
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return {'success': False, 'error': 'No file part'}
+
+    file = request.files['file']
+    if file.filename == '':
+        return {'success': False, 'error': 'No selected file'}
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        file.save(filepath)
+
+        file_url = url_for('static', filename='uploads/' + filename)
+        return {'success': True, 'url': file_url}
+    else:
+        return {'success': False, 'error': 'Invalid file type or size too large'}
+
+
+# === SOCKET.IO EVENTS ===
 @socketio.on('join')
 def handle_join(data):
     room = data.get('room')
@@ -211,6 +247,32 @@ def handle_admin_reply(data):
     }, room=to_user)
 
 
+@socketio.on('image')
+def handle_image(data):
+    sender = data.get('sender')
+    receiver = data.get('receiver')
+    image_url = data.get('url')
+    timestamp = datetime.now().strftime('%H:%M')
+
+    if not sender or not receiver or not image_url:
+        return
+
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT INTO messages (sender, receiver, text) VALUES (?, ?, ?)",
+              (sender, receiver, image_url))
+    conn.commit()
+    conn.close()
+
+    socketio.emit('message', {
+        'user': 'Admin' if sender.lower() == 'admin' else sender,
+        'to': receiver,
+        'text': image_url,
+        'timestamp': timestamp,
+        'is_image': True
+    }, room=receiver if receiver != 'admin' else sender)
+
+
 @socketio.on('load_history')
 def handle_load_history(data):
     username = data.get('username')
@@ -231,7 +293,8 @@ def handle_load_history(data):
     messages = []
     for sender, text in rows:
         user = 'Admin' if sender.lower() == 'admin' else sender
-        messages.append({'user': user, 'text': text})
+        is_image = text.startswith('/static/uploads/')
+        messages.append({'user': user, 'text': text, 'is_image': is_image})
 
     socketio.emit('history', {'messages': messages})
 

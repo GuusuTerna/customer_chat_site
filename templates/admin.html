@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Admin Chat Panel</title>
+    <title>Admin Chat</title>
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='depop-iconn.png') }}" type="image/png">
@@ -48,8 +48,10 @@
         #input-area {
             display: flex;
             gap: 10px;
+            margin-bottom: 10px;
         }
-        input, select {
+        input[type="text"], input[type="file"] {
+            flex-grow: 1;
             padding: 10px;
         }
         button {
@@ -69,7 +71,7 @@
 
     <label for="userSelect">Select user to chat with:</label>
     <select id="userSelect">
-        <option disabled selected>-- Choose a user --</option>
+        <option disabled>-- Choose a user --</option>
         {% for user in users %}
             <option value="{{ user }}">{{ user }}</option>
         {% endfor %}
@@ -77,9 +79,14 @@
 
     <div id="messages"></div>
 
-    <div id="input-area" style="margin-top: 10px;">
+    <div id="input-area">
         <input type="text" id="msgInput" placeholder="Reply to user..." />
         <button onclick="sendReply()">Send</button>
+    </div>
+
+    <div id="input-area">
+        <input type="file" id="imageInput" accept="image/png, image/jpeg, image/gif" />
+        <button onclick="uploadImage()">Upload</button>
     </div>
 
     <script>
@@ -89,12 +96,23 @@
         const LAST_USER_KEY = 'lastSelectedUser';
         let selectedUser = localStorage.getItem(LAST_USER_KEY);
 
-        function renderMessage(from, text) {
+        function renderMessage(from, content, isImage = false) {
             const div = document.createElement('div');
             const bubble = document.createElement('div');
             bubble.classList.add('bubble');
             bubble.classList.add(from === 'Admin' ? 'mine' : 'other');
-            bubble.textContent = `[${from}] ${text}`;
+
+            if (isImage || (typeof content === 'string' && content.startsWith('/static/uploads/'))) {
+                const img = document.createElement('img');
+                img.src = content;
+                img.style.maxWidth = '100%';
+                img.style.borderRadius = '8px';
+                bubble.innerHTML = `[${from}]<br>`;
+                bubble.appendChild(img);
+            } else {
+                bubble.textContent = `[${from}] ${content}`;
+            }
+
             div.appendChild(bubble);
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -102,7 +120,7 @@
 
         function loadChat(user) {
             messagesDiv.innerHTML = '';
-            socket.emit('join', { room: user });  // Admin joins user's room
+            socket.emit('join', { room: user });
             socket.emit('load_history', { username: user });
         }
 
@@ -115,7 +133,7 @@
         socket.on('history', function (data) {
             messagesDiv.innerHTML = '';
             data.messages.forEach(msg => {
-                renderMessage(msg.user, msg.text);
+                renderMessage(msg.user, msg.text, msg.is_image);
             });
         });
 
@@ -132,16 +150,43 @@
             }
         }
 
+        function uploadImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file || !selectedUser) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('image', {
+                        sender: 'admin',
+                        receiver: selectedUser,
+                        url: data.url
+                    });
+                    renderMessage('Admin', data.url, true);
+                } else {
+                    alert("❌ Upload failed: " + data.error);
+                }
+            })
+            .catch(() => alert("❌ Error uploading image."));
+
+            fileInput.value = '';
+        }
+
         socket.on('message', function (data) {
-            if (
-                (data.user === selectedUser && data.to === 'admin') ||
-                (data.user === 'Admin' && data.to === selectedUser)
-            ) {
-                renderMessage(data.user, data.text);
+            if ((data.user === 'Admin' && data.to === selectedUser) ||
+                (data.user === selectedUser && data.to === 'admin')) {
+                renderMessage(data.user, data.text, data.is_image);
             }
         });
 
-        // Auto-select last user
         window.onload = function () {
             if (selectedUser) {
                 userSelect.value = selectedUser;

@@ -47,8 +47,9 @@
         #input-area {
             display: flex;
             gap: 10px;
+            margin-bottom: 10px;
         }
-        input[type="text"] {
+        input[type="text"], input[type="file"] {
             flex-grow: 1;
             padding: 10px;
         }
@@ -79,9 +80,15 @@
 
     <div id="chat-box">
         <div id="messages"></div>
+
         <div id="input-area">
             <input type="text" id="msgInput" placeholder="Type your message..." />
             <button onclick="sendMessage()">Send</button>
+        </div>
+
+        <div id="input-area">
+            <input type="file" id="imageInput" accept="image/png, image/jpeg, image/gif">
+            <button onclick="uploadImage()">Upload</button>
         </div>
     </div>
 
@@ -95,29 +102,33 @@
         const username = "{{ username }}";
         const messagesDiv = document.getElementById('messages');
 
-        // Join the user's private room
         socket.emit('join', { room: username });
-
-        // Load previous messages from server
-        socket.emit('load_history', { username: username });
+        socket.emit('load_history', { username });
 
         socket.on('history', function (data) {
             messagesDiv.innerHTML = '';
             data.messages.forEach(msg => {
-                renderMessage(msg.user, msg.text);
+                renderMessage(msg.user, msg.text, msg.is_image);
             });
         });
 
-        function renderMessage(from, text) {
+        function renderMessage(from, content, isImage = false) {
             const div = document.createElement('div');
             const bubble = document.createElement('div');
             bubble.classList.add('bubble');
-            bubble.textContent = `[${from}] ${text}`;
-            if (from.toLowerCase() === 'admin') {
-                bubble.classList.add('other');
+            bubble.classList.add(from.toLowerCase() === 'admin' ? 'other' : 'mine');
+
+            if (isImage || (typeof content === 'string' && content.startsWith('/static/uploads/'))) {
+                const img = document.createElement('img');
+                img.src = content;
+                img.style.maxWidth = '100%';
+                img.style.borderRadius = '8px';
+                bubble.innerHTML = `[${from}]<br>`;
+                bubble.appendChild(img);
             } else {
-                bubble.classList.add('mine');
+                bubble.textContent = `[${from}] ${content}`;
             }
+
             div.appendChild(bubble);
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -126,27 +137,53 @@
         function sendMessage() {
             const input = document.getElementById('msgInput');
             const message = input.value.trim();
-            if (message !== '') {
+            if (message) {
                 socket.emit('message', {
                     sender: username,
                     receiver: 'admin',
                     text: message
                 });
-                renderMessage(username, message);  // Render immediately
                 input.value = '';
             }
         }
 
         socket.on('message', function(data) {
-            if (
-                (data.user === username && data.to === 'admin') ||
-                (data.user === 'Admin' && data.to === username)
-            ) {
-                renderMessage(data.user, data.text);
+            if ((data.user === username && data.to === 'admin') ||
+                (data.user.toLowerCase() === 'admin' && data.to === username)) {
+                renderMessage(data.user, data.text, data.is_image);
             }
         });
 
-        // Optional: Auto-send FAQ message via ?question= query param
+        function uploadImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('image', {
+                        sender: username,
+                        receiver: 'admin',
+                        url: data.url
+                    });
+                } else {
+                    alert("❌ Upload failed: " + data.error);
+                }
+            })
+            .catch(() => alert("❌ Error uploading image."));
+
+            fileInput.value = ''; // Clear input
+        }
+
+        // Optional FAQ trigger
         window.onload = function () {
             const urlParams = new URLSearchParams(window.location.search);
             const question = urlParams.get('question');
@@ -161,4 +198,5 @@
     </script>
 </body>
 </html>
+
 
