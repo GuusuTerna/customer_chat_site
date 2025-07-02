@@ -86,9 +86,25 @@
         const socket = io();
         let selectedUser = null;
         const messagesDiv = document.getElementById('messages');
+        const userSelect = document.getElementById('userSelect');
 
-        document.getElementById('userSelect').addEventListener('change', function () {
+        // Restore selected user from ?user= query param
+        window.onload = function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const restoredUser = urlParams.get('user');
+            if (restoredUser) {
+                userSelect.value = restoredUser;
+                selectedUser = restoredUser;
+                socket.emit('load_history', { username: selectedUser });
+            }
+        };
+
+        userSelect.addEventListener('change', function () {
             selectedUser = this.value;
+            // Update URL with selected user to preserve on reload
+            const newUrl = window.location.origin + window.location.pathname + '?user=' + selectedUser;
+            window.history.replaceState(null, null, newUrl);
+
             messagesDiv.innerHTML = '';
             socket.emit('load_history', { username: selectedUser });
         });
@@ -124,16 +140,16 @@
         }
 
         socket.on('message', function (data) {
-            if (data.user === 'Admin' || data.user === selectedUser || data.to === selectedUser) {
+            // Display only messages relevant to the selected user
+            if (
+                data.user === 'Admin' && data.to === selectedUser ||
+                data.user === selectedUser && data.to === 'admin'
+            ) {
                 const div = document.createElement('div');
                 const bubble = document.createElement('div');
                 bubble.classList.add('bubble');
                 bubble.textContent = `[${data.user}] ${data.text}`;
-                if (data.user === 'Admin') {
-                    bubble.classList.add('mine');
-                } else {
-                    bubble.classList.add('other');
-                }
+                bubble.classList.add(data.user === 'Admin' ? 'mine' : 'other');
                 div.appendChild(bubble);
                 messagesDiv.appendChild(div);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
