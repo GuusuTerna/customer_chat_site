@@ -102,7 +102,7 @@
 
         function loadChat(user) {
             messagesDiv.innerHTML = '';
-            socket.emit('join', { room: user });
+            socket.emit('join', { room: user }); // Admin joins user's room
             socket.emit('load_history', { username: user });
         }
 
@@ -127,15 +127,15 @@
                     to: selectedUser,
                     text: message
                 });
-
-                // Show the message immediately on admin side
+                // Render immediately on admin side
                 renderMessage('Admin', message);
                 input.value = '';
             }
         }
 
         socket.on('message', function (data) {
-            if (data.user === 'Admin' || data.user === selectedUser || data.to === selectedUser) {
+            if ((data.user === 'Admin' && data.to === selectedUser) ||
+                (data.user === selectedUser && data.to === 'admin')) {
                 renderMessage(data.user, data.text);
             }
         });

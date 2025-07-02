@@ -10,7 +10,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 DB_FILE = 'chat_v2.db'
 
-
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -42,11 +41,9 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
@@ -72,11 +69,9 @@ def subscribe():
 
     return redirect(url_for('index'))
 
-
 @app.route('/join')
 def join():
     return render_template('join.html')
-
 
 @app.route('/chat', methods=['GET', 'POST'])
 def chat():
@@ -91,7 +86,6 @@ def chat():
         if 'username' not in session:
             return redirect(url_for('join'))
         return render_template('chat.html', username=session['username'])
-
 
 @app.route('/adminlogin', methods=['GET', 'POST'])
 def admin_login():
@@ -114,14 +108,12 @@ def admin_login():
 
     return render_template('admin_login.html')
 
-
 @app.route('/logout')
 def logout():
     session.pop('is_admin', None)
     session.pop('username', None)
     flash("You have been logged out.")
     return redirect(url_for('admin_login'))
-
 
 @app.route('/admin')
 def admin():
@@ -134,7 +126,6 @@ def admin():
     users = [row[0] for row in c.fetchall()]
     conn.close()
     return render_template('admin.html', users=users)
-
 
 @app.route('/admin/chat/<username>')
 def view_user_chat(username):
@@ -155,7 +146,6 @@ def view_user_chat(username):
     conn.close()
     return render_template('admin_chat.html', messages=messages, target=username)
 
-
 # === SOCKET EVENTS ===
 @socketio.on('join')
 def handle_join(data):
@@ -163,7 +153,6 @@ def handle_join(data):
     if room:
         join_room(room)
         print(f"{room} joined room")
-
 
 @socketio.on('message')
 def handle_message(data):
@@ -191,7 +180,6 @@ def handle_message(data):
         'timestamp': timestamp
     }, room=receiver if receiver != 'admin' else sender)
 
-
 @socketio.on('admin_reply')
 def handle_admin_reply(data):
     to_user = data.get('to')
@@ -209,14 +197,14 @@ def handle_admin_reply(data):
     conn.commit()
     conn.close()
 
-    # Emit reply to user room
-    socketio.emit('message', {
-        'user': 'Admin',
-        'to': to_user,
-        'text': text,
-        'timestamp': timestamp
-    }, room=to_user)
-
+    # Emit reply to both user and admin panel
+    for room in [to_user, 'admin']:
+        socketio.emit('message', {
+            'user': 'Admin',
+            'to': to_user,
+            'text': text,
+            'timestamp': timestamp
+        }, room=room)
 
 @socketio.on('load_history')
 def handle_load_history(data):
@@ -241,7 +229,6 @@ def handle_load_history(data):
         messages.append({'user': user, 'text': text})
 
     socketio.emit('history', {'messages': messages})
-
 
 if __name__ == '__main__':
     init_db()
