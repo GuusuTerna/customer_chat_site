@@ -69,7 +69,7 @@
 
     <label for="userSelect">Select user to chat with:</label>
     <select id="userSelect">
-        <option disabled selected>-- Choose a user --</option>
+        <option disabled>-- Choose a user --</option>
         {% for user in users %}
             <option value="{{ user }}">{{ user }}</option>
         {% endfor %}
@@ -84,47 +84,39 @@
 
     <script>
         const socket = io();
-        let selectedUser = null;
         const messagesDiv = document.getElementById('messages');
         const userSelect = document.getElementById('userSelect');
+        const LAST_USER_KEY = 'lastSelectedUser';
+        let selectedUser = localStorage.getItem(LAST_USER_KEY);
 
-        // Restore selected user from ?user= query param
-        window.onload = function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            const restoredUser = urlParams.get('user');
-            if (restoredUser) {
-                userSelect.value = restoredUser;
-                selectedUser = restoredUser;
-                socket.emit('load_history', { username: selectedUser });
-            }
-        };
+        function renderMessage(from, text) {
+            const div = document.createElement('div');
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
+            bubble.classList.add(from === 'Admin' ? 'mine' : 'other');
+            bubble.textContent = `[${from}] ${text}`;
+            div.appendChild(bubble);
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function loadChat(user) {
+            messagesDiv.innerHTML = '';
+            socket.emit('join', { room: user });
+            socket.emit('load_history', { username: user });
+        }
 
         userSelect.addEventListener('change', function () {
             selectedUser = this.value;
-            // Update URL with selected user to preserve on reload
-            const newUrl = window.location.origin + window.location.pathname + '?user=' + selectedUser;
-            window.history.replaceState(null, null, newUrl);
-
-            messagesDiv.innerHTML = '';
-            socket.emit('load_history', { username: selectedUser });
+            localStorage.setItem(LAST_USER_KEY, selectedUser);
+            loadChat(selectedUser);
         });
 
         socket.on('history', function (data) {
             messagesDiv.innerHTML = '';
             data.messages.forEach(msg => {
-                const div = document.createElement('div');
-                const bubble = document.createElement('div');
-                bubble.classList.add('bubble');
-                bubble.textContent = `[${msg.user}] ${msg.text}`;
-                if (msg.user === 'Admin') {
-                    bubble.classList.add('mine');
-                } else {
-                    bubble.classList.add('other');
-                }
-                div.appendChild(bubble);
-                messagesDiv.appendChild(div);
+                renderMessage(msg.user, msg.text);
             });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
 
         function sendReply() {
@@ -135,26 +127,26 @@
                     to: selectedUser,
                     text: message
                 });
+
+                // Show the message immediately on admin side
+                renderMessage('Admin', message);
                 input.value = '';
             }
         }
 
         socket.on('message', function (data) {
-            // Display only messages relevant to the selected user
-            if (
-                data.user === 'Admin' && data.to === selectedUser ||
-                data.user === selectedUser && data.to === 'admin'
-            ) {
-                const div = document.createElement('div');
-                const bubble = document.createElement('div');
-                bubble.classList.add('bubble');
-                bubble.textContent = `[${data.user}] ${data.text}`;
-                bubble.classList.add(data.user === 'Admin' ? 'mine' : 'other');
-                div.appendChild(bubble);
-                messagesDiv.appendChild(div);
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (data.user === 'Admin' || data.user === selectedUser || data.to === selectedUser) {
+                renderMessage(data.user, data.text);
             }
         });
+
+        // Auto-select last user on page load
+        window.onload = function () {
+            if (selectedUser) {
+                userSelect.value = selectedUser;
+                loadChat(selectedUser);
+            }
+        };
     </script>
 </body>
 </html>
