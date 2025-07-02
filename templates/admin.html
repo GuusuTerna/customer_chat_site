@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Admin Chat</title>
+    <title>Admin Chat Panel</title>
     <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='depop-iconn.png') }}" type="image/png">
@@ -69,7 +69,7 @@
 
     <label for="userSelect">Select user to chat with:</label>
     <select id="userSelect">
-        <option disabled>-- Choose a user --</option>
+        <option disabled selected>-- Choose a user --</option>
         {% for user in users %}
             <option value="{{ user }}">{{ user }}</option>
         {% endfor %}
@@ -102,7 +102,7 @@
 
         function loadChat(user) {
             messagesDiv.innerHTML = '';
-            socket.emit('join', { room: user }); // Admin joins user's room
+            socket.emit('join', { room: user });  // Admin joins user's room
             socket.emit('load_history', { username: user });
         }
 
@@ -127,18 +127,21 @@
                     to: selectedUser,
                     text: message
                 });
-                renderMessage('Admin', message); // Show message instantly
+                renderMessage('Admin', message);
                 input.value = '';
             }
         }
 
         socket.on('message', function (data) {
-            if ((data.user === 'Admin' && data.to === selectedUser) ||
-                (data.user === selectedUser && data.to === 'admin')) {
+            if (
+                (data.user === selectedUser && data.to === 'admin') ||
+                (data.user === 'Admin' && data.to === selectedUser)
+            ) {
                 renderMessage(data.user, data.text);
             }
         });
 
+        // Auto-select last user
         window.onload = function () {
             if (selectedUser) {
                 userSelect.value = selectedUser;
