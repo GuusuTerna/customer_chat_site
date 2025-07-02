@@ -127,8 +127,7 @@
                     to: selectedUser,
                     text: message
                 });
-                // Render immediately on admin side
-                renderMessage('Admin', message);
+                renderMessage('Admin', message); // Show message instantly
                 input.value = '';
             }
         }
@@ -140,7 +139,6 @@
             }
         });
 
-        // Auto-select last user on page load
         window.onload = function () {
             if (selectedUser) {
                 userSelect.value = selectedUser;
